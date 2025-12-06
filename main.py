@@ -13,7 +13,7 @@ from PIL import Image
 
 # Google Drive FILE IDs (replace these with your actual FILE IDs from the Drive links)
 EMBEDDINGS_ID = "1uyH8Tw3E1R_qQwJz-UR9U2miZzMMmL_v"  # Extract from your copied link
-FILENAMES_ID  = "156YOdPOLF2gn6oSg_ryRXup5Rak_n-_b"   # Extract from your copied link
+FILENAMES_ID  = "17oP4b7X9H4S5d1IDicAvifgawkxlVrvg"   # Extract from your copied link
 
 EMBEDDINGS_PATH = "embeddings.pkl"
 FILENAMES_PATH  = "filenames.pkl"

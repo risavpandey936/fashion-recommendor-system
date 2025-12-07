@@ -3,38 +3,48 @@ import os
 from PIL import Image
 import numpy as np
 import pickle
-import tensorflow
+import tensorflow as tf
 from tensorflow.keras.preprocessing import image
 from tensorflow.keras.layers import GlobalMaxPooling2D
-from tensorflow.keras.applications.resnet50 import ResNet50,preprocess_input
+from tensorflow.keras.applications.resnet50 import ResNet50, preprocess_input
 from sklearn.neighbors import NearestNeighbors
 from numpy.linalg import norm
+import pandas as pd
 
-# Create uploads folder
+# ----------------- Load data & model -----------------
 
+# image embeddings + filenames
+feature_list = np.array(pickle.load(open('embeddings.pkl', 'rb')))
+filenames = pickle.load(open('filenames.pkl', 'rb'))
 
-feature_list = np.array(pickle.load(open('embeddings.pkl','rb')))
-filenames = pickle.load(open('filenames.pkl','rb'))
+# styles metadata
+styles = pd.read_csv("styles_cleaned.csv")
+styles.set_index("id", inplace=True)   # fast lookup by id [web:32]
 
-model = ResNet50(weights='imagenet',include_top=False,input_shape=(224,224,3))
-model.trainable = False
+# ResNet50 model
+base_model = ResNet50(weights='imagenet', include_top=False, input_shape=(224, 224, 3))
+base_model.trainable = False
 
-model = tensorflow.keras.Sequential([
-    model,
+model = tf.keras.Sequential([
+    base_model,
     GlobalMaxPooling2D()
 ])
 
 st.title('Fashion Recommender System')
 
+# ----------------- Helper functions -----------------
+
 def save_uploaded_file(uploaded_file):
     try:
-        with open(os.path.join('uploads',uploaded_file.name),'wb') as f:
+        os.makedirs('uploads', exist_ok=True)
+        with open(os.path.join('uploads', uploaded_file.name), 'wb') as f:
             f.write(uploaded_file.getbuffer())
         return 1
     except:
         return 0
 
-def feature_extraction(img_path,model):
+
+def feature_extraction(img_path, model):
     img = image.load_img(img_path, target_size=(224, 224))
     img_array = image.img_to_array(img)
     expanded_img_array = np.expand_dims(img_array, axis=0)
@@ -43,34 +53,58 @@ def feature_extraction(img_path,model):
     normalized_result = result / norm(result)
     return normalized_result
 
-def recommend(features,feature_list):
+
+def recommend(features, feature_list):
     neighbors = NearestNeighbors(n_neighbors=6, algorithm='brute', metric='euclidean')
     neighbors.fit(feature_list)
     distances, indices = neighbors.kneighbors([features])
     return indices
 
+
+def get_id_from_path(path):
+    base = os.path.basename(path)          # '28543.jpg'
+    id_str = os.path.splitext(base)[0]     # '28543'
+    return int(id_str)                     # 28543 [web:95]
+
+
+def show_item_with_metadata(col, img_path):
+    prod_id = get_id_from_path(img_path)
+
+    if prod_id in styles.index:
+        row = styles.loc[prod_id]
+        col.image(img_path)
+
+        col.markdown(f"**ID:** {prod_id}")
+        col.markdown(f"**Name:** {row['productDisplayName']}")
+        col.markdown(f"**Gender:** {row['gender']}")
+        col.markdown(f"**Category:** {row['masterCategory']} / {row['subCategory']} / {row['articleType']}")
+        col.markdown(f"**Color:** {row['baseColour']}")
+        year_text = int(row['year']) if not pd.isna(row['year']) else 'NA'
+        col.markdown(f"**Season:** {row['season']}  |  **Year:** {year_text}")
+        col.markdown(f"**Usage:** {row['usage']}")
+    else:
+        col.image(img_path)
+        col.write("No metadata found for this item.")
+
+# ----------------- Streamlit UI -----------------
+
 uploaded_file = st.file_uploader("Choose an image")
 if uploaded_file is not None:
     if save_uploaded_file(uploaded_file):
         display_image = Image.open(uploaded_file)
-        st.image(display_image)
-        features = feature_extraction(os.path.join("uploads",uploaded_file.name),model)
-        indices = recommend(features,feature_list)
-        
-        col1,col2,col3,col4,col5 = st.columns(5)  # Changed from st.beta_columns()
+        st.image(display_image, caption="Uploaded Image")
 
-        with col1:
-            st.image(filenames[indices[0][0]])
-        with col2:
-            st.image(filenames[indices[0][1]])
-        with col3:
-            st.image(filenames[indices[0][2]])
-        with col4:
-            st.image(filenames[indices[0][3]])
-        with col5:
-            st.image(filenames[indices[0][4]])
+        features = feature_extraction(os.path.join("uploads", uploaded_file.name), model)
+        indices = recommend(features, feature_list)
+
+        cols = st.columns(5)
+
+        for rank, col in enumerate(cols):
+            img_path = filenames[indices[0][rank]]
+            show_item_with_metadata(col, img_path)
     else:
-        st.header("Some error occured in file upload")
+        st.header("Some error occurred in file upload")
+
 
 
 

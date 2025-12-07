@@ -1,8 +1,8 @@
 images/
 uploads/
-embeddings.pkl
-filenames.pkl
 *.jpg
 *.jpeg
 *.png
+images.zip
+solution.py
 

@@ -15,11 +15,14 @@ import pandas as pd
 
 # image embeddings + filenames
 feature_list = np.array(pickle.load(open('embeddings.pkl', 'rb')))
-filenames = pickle.load(open('filenames.pkl', 'rb'))
+
+filenames_raw = pickle.load(open('filenames.pkl', 'rb'))
+# IMPORTANT: normalize all paths to repo's images/ folder
+filenames = [os.path.join("images", os.path.basename(p)) for p in filenames_raw]
 
 # styles metadata
 styles = pd.read_csv("styles_cleaned.csv")
-styles.set_index("id", inplace=True)   # fast lookup by id [web:32]
+styles.set_index("id", inplace=True)
 
 # ResNet50 model
 base_model = ResNet50(weights='imagenet', include_top=False, input_shape=(224, 224, 3))
@@ -43,7 +46,6 @@ def save_uploaded_file(uploaded_file):
     except:
         return 0
 
-
 def feature_extraction(img_path, model):
     img = image.load_img(img_path, target_size=(224, 224))
     img_array = image.img_to_array(img)
@@ -53,21 +55,23 @@ def feature_extraction(img_path, model):
     normalized_result = result / norm(result)
     return normalized_result
 
-
 def recommend(features, feature_list):
     neighbors = NearestNeighbors(n_neighbors=6, algorithm='brute', metric='euclidean')
     neighbors.fit(feature_list)
     distances, indices = neighbors.kneighbors([features])
     return indices
 
-
 def get_id_from_path(path):
-    base = os.path.basename(path)          # '28543.jpg'
-    id_str = os.path.splitext(base)[0]     # '28543'
-    return int(id_str)                     # 28543 [web:95]
-
+    base = os.path.basename(path)      # '28543.jpg'
+    id_str = os.path.splitext(base)[0] # '28543'
+    return int(id_str)
 
 def show_item_with_metadata(col, img_path):
+    # SAFETY: avoid crash if file not present on server
+    if not os.path.exists(img_path):
+        col.write(f"Image not found on server: {img_path}")
+        return
+
     prod_id = get_id_from_path(img_path)
 
     if prod_id in styles.index:
@@ -94,7 +98,8 @@ if uploaded_file is not None:
         display_image = Image.open(uploaded_file)
         st.image(display_image, caption="Uploaded Image")
 
-        features = feature_extraction(os.path.join("uploads", uploaded_file.name), model)
+        upload_path = os.path.join("uploads", uploaded_file.name)
+        features = feature_extraction(upload_path, model)
         indices = recommend(features, feature_list)
 
         cols = st.columns(5)
@@ -104,6 +109,7 @@ if uploaded_file is not None:
             show_item_with_metadata(col, img_path)
     else:
         st.header("Some error occurred in file upload")
+
 
 
 

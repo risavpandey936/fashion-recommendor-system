@@ -91,7 +91,8 @@ def show_item_with_metadata(col, img_path):
         col.write("No metadata found for this item.")
 
 # ----------------- Streamlit UI -----------------
-
+st.write("Sample filename[0]:", filenames[0])
+st.write("Exists on server?", os.path.exists(filenames[0]))
 uploaded_file = st.file_uploader("Choose an image")
 if uploaded_file is not None:
     if save_uploaded_file(uploaded_file):
@@ -103,6 +104,9 @@ if uploaded_file is not None:
         indices = recommend(features, feature_list)
 
         cols = st.columns(5)
+        st.write("First recommended index:", int(indices[0][0]))
+        st.write("Path for first recommended image:", filenames[indices[0][0]])
+        st.write("Exists?", os.path.exists(filenames[indices[0][0]]))
 
         for rank, col in enumerate(cols):
             img_path = filenames[indices[0][rank]]
